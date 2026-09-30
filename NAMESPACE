@@ -8,20 +8,7 @@ export(mlim.preimpute)
 export(mlim.stata)
 export(mlim.summarize)
 importFrom(curl,curl)
-importFrom(h2o,
-  as.h2o,
-  h2o.automl,
-  h2o.getId,
-  h2o.init,
-  h2o.load_frame,
-  h2o.ls,
-  h2o.no_progress,
-  h2o.predict,
-  h2o.removeAll,
-  h2o.rm,
-  h2o.save_frame,
-  h2o.shutdown
-)
+importFrom(h2o,h2o.init)
 importFrom(md.log,md.log)
 importFrom(memuse,Sys.meminfo)
 importFrom(mice,as.mids)

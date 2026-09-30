@@ -1,4 +1,4 @@
-Package: mlim
+Package: mlimlight
 Type: Package
 Title: Single and Multiple Imputation with Automated Machine Learning
 Version: 0.6.0

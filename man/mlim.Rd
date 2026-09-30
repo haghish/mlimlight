@@ -139,29 +139,23 @@ iterative model-based imputation. The default is \code{"random"}, which performs
 random sampling from each feature. The alternative is \code{"mm"},
 which performs median/mode preimputation.}
 
-\item{cpu}{Integer specifying the number of CPU threads available to H2O. The
-default, \code{1}, which uses only one threads.}
+\item{cpu}{Integer specifying the number of CPU threads supplied to supported learners. The default is \code{1}.}
 
-\item{ram}{Numeric or \code{NULL}. Maximum memory, in gigabytes, allocated to the
-H2O Java server. If \code{NULL}, H2O's default memory allocation is used.}
+\item{ram}{retained for backward compatibility; ignored by the mlr3 backend.}
 
-\item{flush}{Logical. If \code{TRUE}, H2O objects are removed after each
-variable-specific imputation to reduce memory use. This can increase runtime
-because the working data must be uploaded again. The default is \code{FALSE}.}
+\item{flush}{retained for backward compatibility; ignored by the mlr3 backend.}
 
-\item{port}{Object of class numeric representing the port number of the H2O server. The default is 54321.}
+\item{port}{retained for backward compatibility; ignored by the mlr3 backend.}
 
-\item{insecure}{logical. argument for h2o.init to initiate the Java server. default is TRUE}
+\item{insecure}{retained for backward compatibility; ignored by the mlr3 backend.}
 
-\item{https}{logical. argument for h2o.init to initiate the Java server. default is FALSE}
+\item{https}{retained for backward compatibility; ignored by the mlr3 backend.}
 
-\item{bind_to_localhost}{logical. argument for h2o.init to initiate the Java server. default is FALSE}
+\item{bind_to_localhost}{retained for backward compatibility; ignored by the mlr3 backend.}
 
-\item{ignore_config}{logical. argument for h2o.init to initiate the Java server. default is TRUE}
+\item{ignore_config}{retained for backward compatibility; ignored by the mlr3 backend.}
 
-\item{java}{Character or \code{NULL}. Optional path to a 64-bit Java executable,
-primarily for systems where Java is installed but is not available on the system
-path.}
+\item{java}{retained for backward compatibility; ignored by the mlr3 backend.}
 
 \item{preimputed.data}{data.frame. if you have used another software for missing
 data imputation, you can still optimize the imputation

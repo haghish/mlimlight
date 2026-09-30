@@ -3,8 +3,6 @@
 #'              machine learning (AutoML)
 #' @importFrom utils setTxtProgressBar txtProgressBar capture.output packageVersion
 #' @importFrom tools file_ext
-#' @importFrom h2o h2o.init as.h2o h2o.automl h2o.predict h2o.ls
-#'             h2o.removeAll h2o.rm h2o.shutdown h2o.no_progress
 #' @importFrom md.log md.log
 #' @importFrom memuse Sys.meminfo
 #' @importFrom stats var setNames na.omit
@@ -101,7 +99,7 @@
 #                    recommended that you set this argument to FALSE.
 #' @param maxiter integer. maximum number of iterations. the default value is \code{15},
 #'        but it can be reduced to \code{3} (not recommended, see below).
-#' @param port Object of class numeric representing the port number of the H2O server. The default is 54321.
+#' @param port retained for backward compatibility; ignored by the mlr3 backend.
 #' @param cv Integer specifying the number of cross-validation folds. Values of
 #'   \code{5} or higher are required. the default is \code{5}.
 # @param error_metric character. specify the minimum improvement
@@ -169,20 +167,14 @@
 #                 following itterations. otherwise, if FALSE, the current arguments of
 #                 mlim are used to overpower the settings of the mlim object. the settings
 #                 include the full list of the mlim arguments.
-#' @param cpu Integer specifying the number of CPU threads available to H2O. The
-#'   default, \code{1}, which uses only one threads.
-#' @param ram Numeric or \code{NULL}. Maximum memory, in gigabytes, allocated to the
-#'   H2O Java server. If \code{NULL}, H2O's default memory allocation is used.
-#' @param flush Logical. If \code{TRUE}, H2O objects are removed after each
-#'   variable-specific imputation to reduce memory use. This can increase runtime
-#'   because the working data must be uploaded again. The default is \code{FALSE}.
-#' @param java Character or \code{NULL}. Optional path to a 64-bit Java executable,
-#'   primarily for systems where Java is installed but is not available on the system
-#'   path.
-#' @param insecure logical. argument for h2o.init to initiate the Java server. default is TRUE
-#' @param https logical. argument for h2o.init to initiate the Java server. default is FALSE
-#' @param bind_to_localhost logical. argument for h2o.init to initiate the Java server. default is FALSE
-#' @param ignore_config logical. argument for h2o.init to initiate the Java server. default is TRUE
+#' @param cpu Integer specifying the number of CPU threads supplied to supported learners. The default is \code{1}.
+#' @param ram retained for backward compatibility; ignored by the mlr3 backend.
+#' @param flush retained for backward compatibility; ignored by the mlr3 backend.
+#' @param java retained for backward compatibility; ignored by the mlr3 backend.
+#' @param insecure retained for backward compatibility; ignored by the mlr3 backend.
+#' @param https retained for backward compatibility; ignored by the mlr3 backend.
+#' @param bind_to_localhost retained for backward compatibility; ignored by the mlr3 backend.
+#' @param ignore_config retained for backward compatibility; ignored by the mlr3 backend.
 #' @param ... arguments that are used internally between 'mlim'
 #'            these arguments are not documented in the help file and are not
 #'            intended to be used by end user.
@@ -237,27 +229,27 @@ mlim <- function(data = NULL,
                  stochastic = m > 1,
                  ignore = NULL,
                  hierarchy = NULL,
-
+                 
                  # computational resources
                  tuning_time = 3600,
                  max_models = 100, # run all that you can
                  maxiter = 10L,
                  cv = 5L,
-
+                 
                  matching = "AUTO",    #EXPERIMENTAL
                  autobalance = TRUE,
                  #balance = NULL,       #EXPERIMENTAL
                  #ignore.rank = FALSE, #to ignore it, they should make it unordered!
                  # weights_column = NULL,
-
+                 
                  # report and reproducibility
                  seed = NULL,
                  verbosity = NULL,
                  report = NULL,
-
+                 
                  # stopping criteria
                  tolerance = 1e-3,
-
+                 
                  ## simplify the settings by taking these arguments out
                  preimpute = "random",
                  #impute = "AUTO",
@@ -265,7 +257,7 @@ mlim <- function(data = NULL,
                  #stopping_metric = "AUTO",
                  #stopping_rounds = 3,
                  #stopping_tolerance=1e-3,
-
+                 
                  # setup the h2o cluster
                  cpu = 1,
                  ram = NULL,
@@ -276,7 +268,7 @@ mlim <- function(data = NULL,
                  bind_to_localhost = FALSE,
                  ignore_config = TRUE,
                  java = NULL,
-
+                 
                  # NOT YET IMPLEMENTED
                  preimputed.data = NULL,
                  save = NULL,
@@ -284,7 +276,7 @@ mlim <- function(data = NULL,
                  #force.load = TRUE,
                  ...
 ) {
-
+  
   # improvements for the next release
   # ============================================================
   # instead of using all the algorithms at each iteration, add the
@@ -292,12 +284,12 @@ mlim <- function(data = NULL,
   #    perhaps this will help optimizing, while reducing the computation burdon
   # h2o DRF does not give OOB error, so initial comparison preimputation is not possible
   #    HOWEVER, I can estimate the CV for the preimputation procedure
-
+  
   # check the ... arguments
   # ============================================================
   hidden_args <- c("superdebug", "ignore.rank", "sleep", "debug")
   stopifnot("incompatible '...' arguments" = (names(list(...)) %in% hidden_args))
-
+  
   # Simplify the syntax by taking arguments that are less relevant to the majority
   # of the users out
   # ============================================================
@@ -318,9 +310,9 @@ mlim <- function(data = NULL,
   sleep       <- threeDots(name = "sleep", ..., default = .25)
   superdebug  <- threeDots(name = "superdebug", ..., default = FALSE)
   #stochastic  <- threeDots(name = "stochastic", ..., default = FALSE)
-
-
-
+  
+  
+  
   # ============================================================
   # ============================================================
   # LOAD SETTINGS FROM mlim class object
@@ -329,7 +321,7 @@ mlim <- function(data = NULL,
   if (!is.null(load)) {
     if (inherits(load, "character")) load <- readRDS(load)
     if (!inherits(load, "mlim")) stop("loaded object must be of class 'mlim'")
-
+    
     # Data
     # ----------------------------------
     MI             <- load$MI           # dataLast or multiple-imputation data
@@ -341,7 +333,7 @@ mlim <- function(data = NULL,
     metrics        <- load$metrics
     mem            <- load$mem
     orderedCols    <- load$orderedCols
-
+    
     # Loop data
     # ----------------------------------
     m              <- load$m            # number of datasets to impute
@@ -352,14 +344,14 @@ mlim <- function(data = NULL,
     Y              <- load$Y            # last-imputed imputed variable. outside the 'load' argument, it means current variable to be imputed
     vars2impute    <- load$vars2impute
     FAMILY         <- load$FAMILY
-
+    
     if (!is.null(load$allPredictors)) {
       allPredictors <- load$allPredictors
     }
     else {
       allPredictors <- colnames(data)[!colnames(data) %in% load$ignore]
     }
-
+    
     # settings
     # ----------------------------------
     ITERATIONVARS  <- load$ITERATIONVARS# variables to be imputed
@@ -400,8 +392,8 @@ mlim <- function(data = NULL,
     if ("java" %in% names(load)) java <- load$java
     if ("sleep" %in% names(load)) sleep <- load$sleep
     pkg            <- load$pkg #KEEP IT HIDDEN
-
-
+    
+    
     # MOVE-ON to the next variable after loading an mlim object
     # ---------------------------------------------------------
     if (z == length(ITERATIONVARS)) {
@@ -413,7 +405,7 @@ mlim <- function(data = NULL,
       running <- SC$running
       error <- SC$error
     }
-
+    
     if (running) {
       moveOn <- iterationNextVar(m, m.it, k, z, Y, ITERATIONVARS, maxiter)
       m    <- moveOn$m
@@ -423,7 +415,7 @@ mlim <- function(data = NULL,
       Y    <- moveOn$Y
     }
   }
-
+  
   # ============================================================
   # ============================================================
   # Prepare the imputation settings
@@ -431,21 +423,21 @@ mlim <- function(data = NULL,
   # ============================================================
   else {
     if (!is.null(seed)) set.seed(seed) # avoid setting seed by default if it is a continuation
-
+    
     supportedAlgos <- c("ELNET","RF","DL","GBM","XGB", "Ensemble")
     actualNames <- c("GLM","DRF","DeepLearning","GBM","XGBoost", "StackedEnsemble")
-
+    
     for (i in supportedAlgos) {
       if (i %in% algos) algos[which(algos == i)] <- actualNames[which(supportedAlgos == i)]
     }
-
+    
     if (length(setdiff(x=algos, y=c("GLM","DRF","DeepLearning",
                                     "GBM","XGBoost","StackedEnsemble"))) > 0) {
       stop("some of the 'algos' are not recognised")
     }
-
+    
     impute <- algos
-
+    
     synt <- syntaxProcessing(data, hierarchy, preimpute, impute, ram,
                              matching=matching, maxiter, max_models,
                              tuning_time, cv, verbosity=verbosity, report, save)
@@ -455,71 +447,47 @@ mlim <- function(data = NULL,
     verbose <- synt$verbose
     debug <- synt$debug
   }
-
-  # disable h2o progress_bar
-  #if (!debug) h2o::h2o.no_progress()
-  if (!superdebug) h2o::h2o.no_progress()
-
+  
+  
   # ============================================================
   # Initialize the Markdown report
   # ============================================================
   if (is.null(report)) md.log("System information", file=tempfile(),
                               trace=TRUE, sys.info = TRUE, date=TRUE, time=TRUE)
-
+  
   else if (is.null(load)) md.log("System information", file=report,
                                  append = FALSE, trace=TRUE, sys.info = TRUE,
                                  date=TRUE, time=TRUE) #, print=TRUE
-
+  
   else if (!is.null(load)) md.log("\nContinuing from where it was left...", file=report,
                                   append = TRUE, trace=TRUE, sys.info = TRUE,
                                   date=TRUE, time=TRUE)
-
-  # Run H2O on the statistics server¤
-  # ============================================================
-  # Always begin with a fresh local H2O server on the requested port.
-  # If an older H2O cluster is already running there, shut it down
-  # and wait until the port is released before starting a new one.
-  stopH2o(port = port)
+  
   connection <- NULL
-  Sys.sleep(1)
-
-  capture.output(
-    connection <- init(nthreads = cpu,
-                       min_mem_size = min_ram,
-                       max_mem_size = max_ram,
-                       ignore_config = ignore_config,
-                       java = java,
-                       report,
-                       debug,
-                       port = port,
-                       insecure = insecure,
-                       https = https,
-                       bind_to_localhost = bind_to_localhost),
-    file = report, append = TRUE)
-
+  
   # Identify variables for imputation and their models' families
   # ============================================================
   if (is.null(load)) {
     VARS <- selectVariables(data, ignore, verbose, report)
-
+    
     dataNA <- VARS$dataNA # the missing data placeholder
     allPredictors <- VARS$allPredictors
     vars2impute <- VARS$vars2impute
     X <- VARS$X
     bdata <- NULL
-
+    
     # if there is only one variable to impute, there is no need to iterate!
     if (length(vars2impute) < 1) stop("\nthere is nothing to impute!\n")
     else if (length(vars2impute) == 1) {
       maxiter <- 1
     }
-
+    
     # .........................................................
     # check the variables for compatibility
     # .........................................................
     # if preimputed data is provided, take it into consideration!
     if (!is.null(preimputed.data)) {
-
+      
       # if a multiple imputation object is given, take the first dataset
       # ??? in the future, consider that each of the given datasets can
       # be fed independently as a separate "m". for now, this is NOT AN
@@ -528,50 +496,50 @@ mlim <- function(data = NULL,
         #preimputed.data <- preimputed.data[[1]]
         stop("multiple imputation datasets cannot be used as 'preimputed.data'\n")
       }
-
+      
       # if the preimputation was done with mlim, extract the metrics
       else if (inherits(preimputed.data, "mlim")) {
-
-
+        
+        
         # remove the NAs of the last imputation and replace them with
         # the minimum
         metrics <- getMetrics(preimputed.data)
       }
-
+      
       # SAVE RAM: if preimputed.data is given, replace the original data because
       # its missing data is reserved within dataNA
       data <- preimputed.data
-
+      
       # reset the relevant predictors
       X <- allPredictors
     }
-
+    
     Features <- checkNconvert(data, vars2impute, ignore,
                               ignore.rank=ignore.rank, report)
-
+    
     FAMILY<- Features$family
-
+    
     # data  <- Features$data ##> this will be moved inside the loop because
     #                            in multiple imputation, we want to start over
     #                            everytime!
     mem <- Features$mem
     orderedCols <- Features$orderedCols
-
+    
     # .........................................................
     # PREIMPUTATION: replace data with preimputed data
     # .........................................................
     if (preimpute != "iterate" & is.null(preimputed.data)) {
-
+      
       # preimpute in single imputation ONLY. for multiple imputation, each
       # bootstrap dataset is imputed seperately
       if (m == 1) {
         data <- mlim.preimpute(data=data, preimpute=preimpute, seed = NULL) # DO NOT RESET THE SEED!
       }
-
+      
       # reset the relevant predictors
       X <- allPredictors
     }
-
+    
     # .........................................................
     # Remove 'Features', but keep 'preimputed.data' in MI
     # .........................................................
@@ -580,8 +548,8 @@ mlim <- function(data = NULL,
     rm(Features)
     gc()
   }
-
-
+  
+  
   # ............................................................
   # ............................................................
   # ITERATION LOOP
@@ -594,24 +562,24 @@ mlim <- function(data = NULL,
     MI    <- NULL
     error <- setNames(rep(1, length(vars2impute)), vars2impute)
   }
-
+  
   # drop 'load' from the memory
   # ---------------------------
   rm(load)
   gc()
   load <- NULL
-
+  
   # ??? bdata must be NULL at the beginning of each itteration. Currently
   # this is NOT happenning when the 'mlim' object is loaded
-
+  
   for (m.it in m.it:m) {
-
+    
     # Start the new imputation data fresh, if it is multiple imputation
     if (k == 1 & z == 1) {
       if (!is.null(preimputed.data)) data  <- preimputed.data
       md.log(paste("Dataset", m.it), section="section")
     }
-
+    
     #it is always NULL. It doesn't have to be saved
     bdata <- NULL
     dataLast <- iteration_loop(MI, dataNA, preimputed.data, data, bdata, boot=m>1,
@@ -643,29 +611,23 @@ mlim <- function(data = NULL,
                                ignore_config=ignore_config,
                                java=java,
                                running=running)
-
-    connection <- h2o::h2o.getConnection()
-
+    
     if (m > 1) MI[[m.it]] <- dataLast
     else MI <- dataLast
-
+    
     if (!running) {
       k <- 1L
       z <- 1L
       running <- TRUE
     }
   }
-
+  
   message("\n")
-
-
-  md.log("shutting down the server", trace=FALSE)
-  h2o::h2o.shutdown(prompt = FALSE)
-  Sys.sleep(sleep)
-
-
+  
+  
+  
   if (m > 1) class(MI) <- "mlim.mi"
   else class(MI) <- c("mlim", "data.frame")
-
+  
   return(MI)
 }
