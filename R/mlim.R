@@ -6,30 +6,41 @@
 #' @importFrom md.log md.log
 #' @importFrom memuse Sys.meminfo
 #' @importFrom stats var setNames na.omit
-#' @importFrom curl curl
 #' @param data a \code{data.frame} (strictly) with missing data to be
 #'             imputed. if \code{'load'} argument is provided, this argument will be ignored.
 #' @param m integer, specifying number of multiple imputations. the default value is
 #'          1, carrying out a single imputation.
-#' @param algos character vector, specifying algorithms to be used for missing data
-#'              imputation. supported algorithms are "ELNET", "RF", "GBM", "DL",
-#'              "XGB", and "Ensemble". if more than one algorithm is specified,
-#'              mlim changes behavior to save on runtime. for example,
-#'              the default is "ELNET", which fine-tunes an Elastic Net model.
-#'              In general, "ELNET" is expected to
-#'              be the best algorithm because it fine-tunes very fast, it is
-#'              very robust to over-fitting, and hence, it generalizes very well.
-#'              However, if your data has many factor variables, each with several
-#'              levels, it is recommended to have c("ELNET", "RF") as your imputation
-#'              algorithms (and possibly add "Ensemble" as well, to make the most out
-#'              of tuning the models).
+#' @param algos character vector specifying the machine-learning algorithms used
+#'   for imputation. Supported algorithms are \code{"ELNET"} (elastic net via
+#'   \code{glmnet}), \code{"RF"} (random forest via \code{ranger}),
+#'   \code{"CRF"} (conditional random forest via \code{partykit::cforest}),
+#'   \code{"GBM"} (classical gradient boosting via \code{gbm}),
+#'   \code{"XGB"} (XGBoost), \code{"LGBM"} (LightGBM), \code{"CAT"}
+#'   (CatBoost), \code{"NNET"} (single-hidden-layer neural network via
+#'   \code{nnet}), \code{"SVM"} (kernel support vector machine via
+#'   \code{kernlab::ksvm}), \code{"KNN"} (k-nearest neighbors),
+#'   \code{"NB"} (Naive Bayes; classification only), and \code{"ENSEMBLE"}.
+#'   The default is \code{"ELNET"}.
 #'
-#'              Note that "XGB" is only available in Mac OS and Linux. moreover,
-#'              "GBM", "DL" and "XGB" take the full given "tuning_time" (see below) to
-#'              tune the best model for imputing he given variable, whereas "ELNET"
-#'              will produce only one fine-tuned model, often at less time than
-#'              other algorithms need for developing a single model, which is why "ELNET"
-#'              is work horse of the mlim imputation package.
+#'   When several base algorithms are supplied, \code{max_models} and
+#'   \code{tuning_time} are divided across the base algorithms and the
+#'   best-performing candidate is used. If \code{"ENSEMBLE"} is included,
+#'   at least two additional base algorithms must also be supplied. The ensemble
+#'   is a stacked model constructed with \code{mlr3pipelines} using
+#'   cross-validated predictions from the successfully tuned base learners and
+#'   is evaluated as an additional candidate after base-learner tuning.
+#'
+#'   The current \code{mlr3extralearners} \code{classif.gbm} wrapper supports
+#'   two-class classification but not multiclass classification; therefore
+#'   \code{"GBM"} is skipped for multinomial targets when other learners are
+#'   available.
+#'
+#'   \code{"KNN"} and \code{"NB"} do not support observation weights in their
+#'   current mlr3 learners. They can therefore be evaluated in single imputation,
+#'   but are skipped during multiple imputation because bootstrap multiplicity
+#'   weights are required for model fitting. When class balancing is requested
+#'   in single imputation, these two learners are fitted without learner weights,
+#'   although balancing weights are retained for performance assessment.
 #' @param preimpute Character specifying the initial treatment of missing values before
 #'   iterative model-based imputation. The default is \code{"random"}, which performs
 #'   random sampling from each feature. The alternative is \code{"mm"},
@@ -51,17 +62,18 @@
 #'   nested within cities. Hierarchy variables must exist in \code{data} and cannot
 #'   contain missing values. The default is \code{NULL}, which assumes no
 #'   hierarchical structure.
-#' @param tuning_time Numeric. Maximum runtime in seconds for AutoML tuning of each
-#'   variable in each iteration. The default is \code{3600} seconds.
-#'   this argument is influenced by \code{max_models}, see below.
-#'   mlim trains models until either max_models or tuning_time is
-#'   reached.
-#' @param max_models Integer or \code{NULL}. Maximum number of models that mlim may
-#'   fit for each variable and iteration. If \code{NULL}, no explicit model-count
-#'   limit is supplied by \code{mlim}. For algorithms other than ELNET and RF,
-#'   this argument is strongly recommended.the default is 100 models per feature
-#'   with missing values. mlim trains models until either max_models or tuning_time is
-#'   reached.
+#' @param tuning_time Numeric. Maximum base-learner tuning runtime in seconds for
+#'   each variable and iteration. The default is \code{3600}. When several base
+#'   algorithms are selected, this budget is divided across them. Tuning stops
+#'   when the applicable time or evaluation limit is reached. A requested stacked
+#'   ensemble is evaluated after base-learner tuning and does not consume this
+#'   base-learner tuning-time allocation.
+#' @param max_models Integer or \code{NULL}. Maximum number of hyperparameter
+#'   evaluations across the base algorithms for each variable and iteration.
+#'   The default is \code{100}. When several base algorithms are selected, this
+#'   budget is divided across them. If \code{NULL}, no explicit evaluation-count
+#'   limit is supplied by \code{mlim}. \code{"ENSEMBLE"} does not count as a base
+#'   algorithm for this allocation.
 #' @param autobalance logical. if TRUE (default), binary and multinomial factor variables
 #'                    are balanced during single imputation. During multiple imputation,
 #'                    balancing weights are combined with bootstrap multiplicity weights.
@@ -99,7 +111,6 @@
 #                    recommended that you set this argument to FALSE.
 #' @param maxiter integer. maximum number of iterations. the default value is \code{15},
 #'        but it can be reduced to \code{3} (not recommended, see below).
-#' @param port retained for backward compatibility; ignored by the mlr3 backend.
 #' @param cv Integer specifying the number of cross-validation folds. Values of
 #'   \code{5} or higher are required. the default is \code{5}.
 # @param error_metric character. specify the minimum improvement
@@ -142,9 +153,6 @@
 #'               reduced markdown-like report is generated. default is NULL.
 #' @param verbosity character. controls how much information is printed to console.
 #'                  the value can be "warn" (default), "info", "debug", or NULL.
-# @param init logical. should h2o Java server be initiated? the default is TRUE.
-#             however, if the Java server is already running, set this argument
-#'             to FALSE.
 #' @param preimputed.data data.frame. if you have used another software for missing
 #'                      data imputation, you can still optimize the imputation
 #'                      by handing the data.frame to this argument, which will
@@ -167,14 +175,7 @@
 #                 following itterations. otherwise, if FALSE, the current arguments of
 #                 mlim are used to overpower the settings of the mlim object. the settings
 #                 include the full list of the mlim arguments.
-#' @param cpu Integer specifying the number of CPU threads supplied to supported learners. The default is \code{1}.
-#' @param ram retained for backward compatibility; ignored by the mlr3 backend.
-#' @param flush retained for backward compatibility; ignored by the mlr3 backend.
-#' @param java retained for backward compatibility; ignored by the mlr3 backend.
-#' @param insecure retained for backward compatibility; ignored by the mlr3 backend.
-#' @param https retained for backward compatibility; ignored by the mlr3 backend.
-#' @param bind_to_localhost retained for backward compatibility; ignored by the mlr3 backend.
-#' @param ignore_config retained for backward compatibility; ignored by the mlr3 backend.
+#' @param cpu Integer specifying the number of CPU threads supplied to learners that support internal multithreading. The default is \code{1}.
 #' @param ... arguments that are used internally between 'mlim'
 #'            these arguments are not documented in the help file and are not
 #'            intended to be used by end user.
@@ -211,9 +212,8 @@
 #' # you can check the accuracy of the imputation, if you have the original dataset
 #' mlim.error(MLIM2, dfNA, iris)
 #
-# ### run GBM, RF, ELNET, and Ensemble algos and allow 60 minutes of tuning for each variable
-# ### this requires a lot of RAM on your machine and a lot of time!
-# MLIM <- mlim(dfNA, algos = c("GBM", "RF","ELNET","Ensemble"), tuning_time=60*60)
+# ### compare several learners and a stacked ensemble
+# MLIM <- mlim(dfNA, algos = c("ELNET", "RF", "XGB", "ENSEMBLE"), tuning_time=60*60)
 # mlim.error(MLIM, dfNA, iris)
 #
 # ### if you have a larger data, there is a few things you can set to make the
@@ -258,16 +258,8 @@ mlim <- function(data = NULL,
                  #stopping_rounds = 3,
                  #stopping_tolerance=1e-3,
                  
-                 # setup the h2o cluster
+                 # computational resources
                  cpu = 1,
-                 ram = NULL,
-                 flush = FALSE,
-                 port = 54321,
-                 insecure = TRUE,
-                 https = FALSE,
-                 bind_to_localhost = FALSE,
-                 ignore_config = TRUE,
-                 java = NULL,
                  
                  # NOT YET IMPLEMENTED
                  preimputed.data = NULL,
@@ -282,8 +274,6 @@ mlim <- function(data = NULL,
   # instead of using all the algorithms at each iteration, add the
   #    other algorithms when the first algorithm stops being useful.
   #    perhaps this will help optimizing, while reducing the computation burdon
-  # h2o DRF does not give OOB error, so initial comparison preimputation is not possible
-  #    HOWEVER, I can estimate the CV for the preimputation procedure
   
   # check the ... arguments
   # ============================================================
@@ -355,7 +345,7 @@ mlim <- function(data = NULL,
     # settings
     # ----------------------------------
     ITERATIONVARS  <- load$ITERATIONVARS# variables to be imputed
-    impute         <- load$impute       # reimputation algorithm(s)
+    impute         <- toupper(load$impute) # reimputation algorithm(s)
     autobalance    <- load$autobalance #EXPERIMENTAL
     if ("preimpute" %in% names(load)) preimpute <- load$preimpute
     if ("hierarchy" %in% names(load)) hierarchy <- load$hierarchy
@@ -376,20 +366,10 @@ mlim <- function(data = NULL,
     verbose        <- load$verbose #KEEP IT HIDDEN
     debug          <- load$debug   #KEEP IT HIDDEN
     report         <- load$report
-    flush          <- load$flush
     error_metric   <- load$error_metric #KEEP IT HIDDEN
     error          <- load$error  #KEEP IT HIDDEN
     tolerance      <- load$tolerance
     cpu            <- load$cpu
-    max_ram        <- load$max_ram
-    min_ram        <- load$min_ram #KEEP IT HIDDEN
-    keep_cv        <- load$keep_cv
-    if ("port" %in% names(load)) port <- load$port
-    if ("insecure" %in% names(load)) insecure <- load$insecure
-    if ("https" %in% names(load)) https <- load$https
-    if ("bind_to_localhost" %in% names(load)) bind_to_localhost <- load$bind_to_localhost
-    if ("ignore_config" %in% names(load)) ignore_config <- load$ignore_config
-    if ("java" %in% names(load)) java <- load$java
     if ("sleep" %in% names(load)) sleep <- load$sleep
     pkg            <- load$pkg #KEEP IT HIDDEN
     
@@ -424,26 +404,12 @@ mlim <- function(data = NULL,
   else {
     if (!is.null(seed)) set.seed(seed) # avoid setting seed by default if it is a continuation
     
-    supportedAlgos <- c("ELNET","RF","DL","GBM","XGB", "Ensemble")
-    actualNames <- c("GLM","DRF","DeepLearning","GBM","XGBoost", "StackedEnsemble")
+    impute <- unique(toupper(algos))
     
-    for (i in supportedAlgos) {
-      if (i %in% algos) algos[which(algos == i)] <- actualNames[which(supportedAlgos == i)]
-    }
-    
-    if (length(setdiff(x=algos, y=c("GLM","DRF","DeepLearning",
-                                    "GBM","XGBoost","StackedEnsemble"))) > 0) {
-      stop("some of the 'algos' are not recognised")
-    }
-    
-    impute <- algos
-    
-    synt <- syntaxProcessing(data, hierarchy, preimpute, impute, ram,
+    synt <- syntaxProcessing(data, hierarchy, preimpute, impute,
                              matching=matching, maxiter, max_models,
-                             tuning_time, cv, verbosity=verbosity, report, save)
-    min_ram <- synt$min_ram
-    max_ram <- synt$max_ram
-    keep_cv <- synt$keep_cross_validation_predictions #???should be removed
+                             tuning_time, cv, cpu,
+                             verbosity=verbosity, report, save)
     verbose <- synt$verbose
     debug <- synt$debug
   }
@@ -462,8 +428,6 @@ mlim <- function(data = NULL,
   else if (!is.null(load)) md.log("\nContinuing from where it was left...", file=report,
                                   append = TRUE, trace=TRUE, sys.info = TRUE,
                                   date=TRUE, time=TRUE)
-  
-  connection <- NULL
   
   # Identify variables for imputation and their models' families
   # ============================================================
@@ -592,24 +556,14 @@ mlim <- function(data = NULL,
                                # settings
                                error_metric, FAMILY=FAMILY, cv, tuning_time,
                                max_models,
-                               keep_cv,
                                autobalance, #balance,
-                               seed, save, flush,
+                               seed, save,
                                verbose, debug, report, sleep,
                                # saving settings
                                mem, orderedCols, ignore, maxiter,
                                miniter, matching, ignore.rank,
-                               verbosity, error, cpu, max_ram=max_ram, min_ram=min_ram,
-                               #??? shutdown has to be fixed in future updates
-                               shutdown=FALSE, clean = TRUE,
+                               verbosity, error, cpu, clean = TRUE,
                                stochastic=stochastic,
-                               connection=connection,
-                               port=port,
-                               insecure=insecure,
-                               https=https,
-                               bind_to_localhost=bind_to_localhost,
-                               ignore_config=ignore_config,
-                               java=java,
                                running=running)
     
     if (m > 1) MI[[m.it]] <- dataLast

@@ -8,7 +8,6 @@ export(mlim.preimpute)
 export(mlim.stata)
 export(mlim.summarize)
 importFrom(curl,curl)
-importFrom(h2o,h2o.init)
 importFrom(md.log,md.log)
 importFrom(memuse,Sys.meminfo)
 importFrom(mice,as.mids)
@@ -16,9 +15,33 @@ importFrom(missRanger,
   imputeUnivariate,
   missRanger
 )
+importFrom(mlr3,
+  TaskClassif,
+  TaskRegr,
+  lrn,
+  msr,
+  resample,
+  rsmp
+)
+importFrom(mlr3pipelines,
+  GraphLearner,
+  pipeline_stacking
+)
+importFrom(mlr3tuning,
+  tnr,
+  tune
+)
+importFrom(paradox,
+  p_dbl,
+  p_fct,
+  p_int,
+  ps,
+  to_tune
+)
 importFrom(readstata13,save.dta13)
 importFrom(stats,
   median,
+  model.matrix,
   na.omit,
   rnorm,
   setNames,

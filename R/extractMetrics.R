@@ -1,13 +1,18 @@
 #' @title extractMetrics
 #' @description extracts performance metrics from cross-validation
+#' @param data data.frame used to obtain the target variable
+#' @param k integer. current imputation iteration
+#' @param v character. target variable name
+#' @param perf list of cross-validation performance metrics
+#' @param family model family of the target variable
 #' @return data.frame of error metrics.
 #' @author E. F. Haghish
 #' @keywords Internal
 #' @noRd
 
-extractMetrics <- function(hex, k, v, perf, family) {
+extractMetrics <- function(data, k, v, perf, family) {
   
-  target <- hex[[v]]
+  target <- data[[v]]
   
   if (is.numeric(target)) {
     variance <- stats::var(target, na.rm = TRUE)

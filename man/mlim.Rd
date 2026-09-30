@@ -23,14 +23,6 @@ mlim(
   tolerance = 0.001,
   preimpute = "random",
   cpu = 1,
-  ram = NULL,
-  flush = FALSE,
-  port = 54321,
-  insecure = TRUE,
-  https = FALSE,
-  bind_to_localhost = FALSE,
-  ignore_config = TRUE,
-  java = NULL,
   preimputed.data = NULL,
   save = NULL,
   load = NULL,
@@ -44,25 +36,37 @@ imputed. if \code{'load'} argument is provided, this argument will be ignored.}
 \item{m}{integer, specifying number of multiple imputations. the default value is
 1, carrying out a single imputation.}
 
-\item{algos}{character vector, specifying algorithms to be used for missing data
-             imputation. supported algorithms are "ELNET", "RF", "GBM", "DL",
-             "XGB", and "Ensemble". if more than one algorithm is specified,
-             mlim changes behavior to save on runtime. for example,
-             the default is "ELNET", which fine-tunes an Elastic Net model.
-             In general, "ELNET" is expected to
-             be the best algorithm because it fine-tunes very fast, it is
-             very robust to over-fitting, and hence, it generalizes very well.
-             However, if your data has many factor variables, each with several
-             levels, it is recommended to have c("ELNET", "RF") as your imputation
-             algorithms (and possibly add "Ensemble" as well, to make the most out
-             of tuning the models).
+\item{algos}{character vector specifying the machine-learning algorithms used
+  for imputation. Supported algorithms are \code{"ELNET"} (elastic net via
+  \code{glmnet}), \code{"RF"} (random forest via \code{ranger}),
+  \code{"CRF"} (conditional random forest via \code{partykit::cforest}),
+  \code{"GBM"} (classical gradient boosting via \code{gbm}),
+  \code{"XGB"} (XGBoost), \code{"LGBM"} (LightGBM), \code{"CAT"}
+  (CatBoost), \code{"NNET"} (single-hidden-layer neural network via
+  \code{nnet}), \code{"SVM"} (kernel support vector machine via
+  \code{kernlab::ksvm}), \code{"KNN"} (k-nearest neighbors),
+  \code{"NB"} (Naive Bayes; classification only), and \code{"ENSEMBLE"}.
+  The default is \code{"ELNET"}.
 
-             Note that "XGB" is only available in Mac OS and Linux. moreover,
-             "GBM", "DL" and "XGB" take the full given "tuning_time" (see below) to
-             tune the best model for imputing he given variable, whereas "ELNET"
-             will produce only one fine-tuned model, often at less time than
-             other algorithms need for developing a single model, which is why "ELNET"
-             is work horse of the mlim imputation package.}
+  When several base algorithms are supplied, \code{max_models} and
+  \code{tuning_time} are divided across the base algorithms and the
+  best-performing candidate is used. If \code{"ENSEMBLE"} is included,
+  at least two additional base algorithms must also be supplied. The ensemble
+  is a stacked model constructed with \code{mlr3pipelines} using
+  cross-validated predictions from the successfully tuned base learners and
+  is evaluated as an additional candidate after base-learner tuning.
+
+  The current \code{mlr3extralearners} \code{classif.gbm} wrapper supports
+  two-class classification but not multiclass classification; therefore
+  \code{"GBM"} is skipped for multinomial targets when other learners are
+  available.
+
+  \code{"KNN"} and \code{"NB"} do not support observation weights in their
+  current mlr3 learners. They can therefore be evaluated in single imputation,
+  but are skipped during multiple imputation because bootstrap multiplicity
+  weights are required for model fitting. When class balancing is requested
+  in single imputation, these two learners are fitted without learner weights,
+  although balancing weights are retained for performance assessment.}
 
 \item{stochastic}{Logical. If \code{TRUE}, stochastic variation is added after each
 accepted variable-specific imputation update. For continuous variables, values
@@ -83,18 +87,19 @@ nested within cities. Hierarchy variables must exist in \code{data} and cannot
 contain missing values. The default is \code{NULL}, which assumes no
 hierarchical structure.}
 
-\item{tuning_time}{Numeric. Maximum runtime in seconds for AutoML tuning of each
-variable in each iteration. The default is \code{3600} seconds.
-this argument is influenced by \code{max_models}, see below.
-mlim trains models until either max_models or tuning_time is
-reached.}
+\item{tuning_time}{Numeric. Maximum base-learner tuning runtime in seconds for
+each variable and iteration. The default is \code{3600}. When several base
+algorithms are selected, this budget is divided across them. Tuning stops
+when the applicable time or evaluation limit is reached. A requested stacked
+ensemble is evaluated after base-learner tuning and does not consume this
+base-learner tuning-time allocation.}
 
-\item{max_models}{Integer or \code{NULL}. Maximum number of models that mlim may
-fit for each variable and iteration. If \code{NULL}, no explicit model-count
-limit is supplied by \code{mlim}. For algorithms other than ELNET and RF,
-this argument is strongly recommended.the default is 100 models per feature
-with missing values. mlim trains models until either max_models or tuning_time is
-reached.}
+\item{max_models}{Integer or \code{NULL}. Maximum number of hyperparameter
+evaluations across the base algorithms for each variable and iteration.
+The default is \code{100}. When several base algorithms are selected, this
+budget is divided across them. If \code{NULL}, no explicit evaluation-count
+limit is supplied by \code{mlim}. \code{"ENSEMBLE"} does not count as a base
+algorithm for this allocation.}
 
 \item{maxiter}{integer. maximum number of iterations. the default value is \code{15},
 but it can be reduced to \code{3} (not recommended, see below).}
@@ -114,8 +119,7 @@ balancing weights are combined with bootstrap multiplicity weights.}
 \item{seed}{integer. specify the random generator seed}
 
 \item{verbosity}{character. controls how much information is printed to console.
-     the value can be "warn" (default), "info", "debug", or NULL.
-to FALSE.}
+the value can be "warn" (default), "info", "debug", or NULL.}
 
 \item{report}{filename. if a filename is specified (e.g. report = "mlim.md"), the \code{"md.log"} R
 package is used to generate a Markdown progress report for the
@@ -139,23 +143,7 @@ iterative model-based imputation. The default is \code{"random"}, which performs
 random sampling from each feature. The alternative is \code{"mm"},
 which performs median/mode preimputation.}
 
-\item{cpu}{Integer specifying the number of CPU threads supplied to supported learners. The default is \code{1}.}
-
-\item{ram}{retained for backward compatibility; ignored by the mlr3 backend.}
-
-\item{flush}{retained for backward compatibility; ignored by the mlr3 backend.}
-
-\item{port}{retained for backward compatibility; ignored by the mlr3 backend.}
-
-\item{insecure}{retained for backward compatibility; ignored by the mlr3 backend.}
-
-\item{https}{retained for backward compatibility; ignored by the mlr3 backend.}
-
-\item{bind_to_localhost}{retained for backward compatibility; ignored by the mlr3 backend.}
-
-\item{ignore_config}{retained for backward compatibility; ignored by the mlr3 backend.}
-
-\item{java}{retained for backward compatibility; ignored by the mlr3 backend.}
+\item{cpu}{Integer specifying the number of CPU threads supplied to learners that support internal multithreading. The default is \code{1}.}
 
 \item{preimputed.data}{data.frame. if you have used another software for missing
 data imputation, you can still optimize the imputation
