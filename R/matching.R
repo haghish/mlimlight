@@ -1,44 +1,49 @@
-
-#' @title match imputed missing observations to non-missing values
-#' @description each imputed numeric missing value is replaced with the nearest
-#'              non-missing value. this option is particularly
-#'              recommended when ordinal variables are imputed as a numeric
-#'              variables.
+#' @title match imputed ordinal missing observations to non-missing values
+#' @description Replaces each imputed ordinal value with
+#' the nearest valid ordinal level. Ties are resolved in
+#' favor of the lower level.
 #' @param imputed numeric vector of imputed missing values
-#' @param nonMiss numeric vector of non-missing values
+#' @param observed numeric vector of non-missing values
 #' @return numeric vector of the imputed values
 #' @author E. F. Haghish
 #' @keywords Internal
 #' @noRd
 
-matching <- function(imputed, nonMiss, md.log) {
+matching <- function(imputed, observed) {
 
-  if (!is.null(imputed) & !is.null(nonMiss)) {
-    if (is.numeric(imputed) & is.numeric(nonMiss)) {
-      # get the unique values
-      unqImputed <- unique(imputed)
-      unqNonMiss <- unique(nonMiss[!is.na(nonMiss)])
-
-      # avoid imputed values that are already in nnMiss set
-      unqImputed <- setdiff(unqImputed, unqNonMiss)
-
-      # index the unique values and replace them in the vectors
-      for (i in unqImputed) {
-        nearest <- which.min(abs(unqNonMiss - i))[1]
-        index <- which(imputed == i)
-        imputed[index] <- unqNonMiss[nearest]
-      }
-
-      md.log("matching successul!")
-
-      return(imputed)
-    }
+  if (!is.numeric(imputed)) {
+    stop("'imputed' must be numeric.", call. = FALSE)
   }
+
+  if (!is.numeric(observed) || length(observed) < 1L) {
+    stop(
+      "'observed' must contain valid ordinal levels.",
+      call. = FALSE
+    )
+  }
+
+  observed <- sort(unique(observed))
+
+  if (anyNA(observed) || any(!is.finite(observed))) {
+    stop(
+      "'observed' must contain finite values only.",
+      call. = FALSE
+    )
+  }
+
+  observed <- !is.na(imputed)
+  if (any(!is.finite(imputed[observed]))) {
+    stop(
+      "'imputed' contains non-finite values.",
+      call. = FALSE
+    )
+  }
+
+  for (i in which(observed)) {
+    distance <- abs(observed - imputed[i])
+    nearest <- observed[distance == min(distance)]
+    imputed[i] <- min(nearest)
+  }
+
+  return(imputed)
 }
-
-
-#nonMiss <- c(1:20, 19:1)
-#imputed <- c(11.5, 12.2, 11.51, 14.1, -1, 49, 20, 1, 4)
-#ching(imputed, nonMiss, F)
-
-

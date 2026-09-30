@@ -18,8 +18,8 @@
 #'   \code{"XGB"} (XGBoost), \code{"LGBM"} (LightGBM), \code{"CAT"}
 #'   (CatBoost), \code{"NNET"} (single-hidden-layer neural network via
 #'   \code{nnet}), \code{"SVM"} (kernel support vector machine via
-#'   \code{kernlab::ksvm}), \code{"KNN"} (k-nearest neighbors),
-#'   \code{"NB"} (Naive Bayes; classification only), and \code{"ENSEMBLE"}.
+#'   \code{kernlab::ksvm}), \code{"KNN"} (k-nearest neighbors), and
+#'   \code{"ENSEMBLE"}.
 #'   The default is \code{"ELNET"}.
 #'
 #'   When several base algorithms are supplied, \code{max_models} and
@@ -35,12 +35,12 @@
 #'   \code{"GBM"} is skipped for multinomial targets when other learners are
 #'   available.
 #'
-#'   \code{"KNN"} and \code{"NB"} do not support observation weights in their
-#'   current mlr3 learners. They can therefore be evaluated in single imputation,
-#'   but are skipped during multiple imputation because bootstrap multiplicity
-#'   weights are required for model fitting. When class balancing is requested
-#'   in single imputation, these two learners are fitted without learner weights,
-#'   although balancing weights are retained for performance assessment.
+#'   \code{"KNN"} does not support observation weights in its current mlr3
+#'   learner. It can therefore be evaluated in single imputation, but is skipped
+#'   during multiple imputation because bootstrap multiplicity weights are
+#'   required for model fitting. When class balancing is requested in single
+#'   imputation, KNN is fitted without learner weights, although balancing
+#'   weights are retained for performance assessment.
 #' @param preimpute Character specifying the initial treatment of missing values before
 #'   iterative model-based imputation. The default is \code{"random"}, which performs
 #'   random sampling from each feature. The alternative is \code{"mm"},

@@ -14,8 +14,8 @@
 #' \code{requireNamespace()}: \pkg{glmnet} (ELNET), \pkg{ranger} (RF),
 #' \pkg{partykit}, \pkg{sandwich}, and \pkg{coin} (CRF), \pkg{gbm} (GBM),
 #' \pkg{xgboost} (XGB), \pkg{lightgbm} (LGBM), \pkg{catboost} (CAT),
-#' \pkg{nnet} (NNET), \pkg{kernlab} (SVM), \pkg{kknn} (KNN), and
-#' \pkg{e1071} (NB). These backend packages are not imported wholesale because
+#' \pkg{nnet} (NNET), \pkg{kernlab} (SVM), and \pkg{kknn} (KNN). These
+#' backend packages are not imported wholesale because
 #' they are only required when their corresponding learner is requested.
 #'
 #' @importFrom utils packageVersion
@@ -177,9 +177,9 @@ iterate <- function(MI, dataNA, bdataNA,
     
     # Construct a task for each learner. Learners supporting observation
     # weights receive weights for both fitting and performance estimation.
-    # KNN and NB do not support learner weights. They can therefore be used
-    # in single imputation, where balancing weights are retained for the
-    # performance measure only, but they are skipped during multiple
+    # KNN does not support learner weights. It can therefore be used in
+    # single imputation, where balancing weights are retained for the
+    # performance measure only, but it is skipped during multiple
     # imputation because bootstrap multiplicity weights must affect fitting.
     # ============================================================
     make_task <- function(weight_mode = c("full", "measure")) {
@@ -237,19 +237,8 @@ iterate <- function(MI, dataNA, bdataNA,
     requested_base_algorithms <- setdiff(algorithms, "ENSEMBLE")
     base_algorithms <- requested_base_algorithms
     
-    # NB is classification-only. The current mlr3 GBM classification wrapper
-    # is two-class only, so neither learner should consume tuning budget for
-    # target types it cannot fit.
-    if (!classification && "NB" %in% base_algorithms) {
-      if (debug) {
-        md.log(
-          paste("skipping NB for continuous variable", Y),
-          date = debug, time = debug, trace = FALSE
-        )
-      }
-      base_algorithms <- setdiff(base_algorithms, "NB")
-    }
-    
+    # The current mlr3 GBM classification wrapper is two-class only, so GBM
+    # should not consume tuning budget for multinomial targets.
     if (classification &&
         nlevels(target) > 2L &&
         "GBM" %in% base_algorithms) {
@@ -310,7 +299,6 @@ iterate <- function(MI, dataNA, bdataNA,
         NNET = c("mlr3learners", "nnet"),
         SVM = c("mlr3extralearners", "kernlab"),
         KNN = c("mlr3learners", "kknn"),
-        NB = c("mlr3learners", "e1071"),
         character(0)
       )
       
@@ -362,7 +350,6 @@ iterate <- function(MI, dataNA, bdataNA,
         NNET = if (classification) "classif.nnet" else "regr.nnet",
         SVM = if (classification) "classif.ksvm" else "regr.ksvm",
         KNN = if (classification) "classif.kknn" else "regr.kknn",
-        NB = "classif.naive_bayes",
         stop(paste("unsupported algorithm", algorithm))
       )
       
@@ -399,7 +386,7 @@ iterate <- function(MI, dataNA, bdataNA,
       supports_weights <- "weights" %in% learner$properties
       
       # Bootstrap multiplicity weights are part of the multiple-imputation
-      # design and cannot be ignored. KNN and NB therefore cannot compete in
+      # design and cannot be ignored. KNN therefore cannot compete in
       # multiple imputation with the current weighted-bootstrap implementation.
       if (boot && !supports_weights) {
         message(
@@ -649,14 +636,6 @@ iterate <- function(MI, dataNA, bdataNA,
         )
         
         learner$param_set$values$scale <- TRUE
-      }
-      
-      # ----------------------------------------------------------
-      # NB: e1071 Naive Bayes, classification only
-      # ----------------------------------------------------------
-      else if (algorithm == "NB") {
-        learner$param_set$values$laplace <-
-          paradox::to_tune(0, 2)
       }
       
       # Use the user-supplied seed in learners exposing a conventional

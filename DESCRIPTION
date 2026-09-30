@@ -30,7 +30,6 @@ Imports:
     xgboost,
     nnet,
     kknn,
-    e1071,
     mice,
     missRanger,
     memuse,

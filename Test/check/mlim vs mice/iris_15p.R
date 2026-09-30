@@ -2,10 +2,10 @@ source("~/Documents/GitHub/mlimlight/Test/check/mlim vs mice/functions.R")
 library(mlimlight)
 library(mice)
 data("iris")
+df <- iris
 
 # add completely at random missingness at 15% rate
 # ==================================================
-df <- iris
 dfNA <- mlim.na(df, p = .2, stratify = FALSE, seed = 2022)
 
 # MLIM - ELNET + random preimputation

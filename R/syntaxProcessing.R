@@ -120,7 +120,6 @@ syntaxProcessing <- function(
     "NNET",
     "SVM",
     "KNN",
-    "NB",
     "ENSEMBLE"
   )
   unsupported <- setdiff(algorithms, supported)

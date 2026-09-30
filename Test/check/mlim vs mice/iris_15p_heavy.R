@@ -1,9 +1,8 @@
 setwd("~/Documents/GitHub/mlim/check/mlim vs mice")
 source("./functions.R")
 
-options(prefer_RCurl = FALSE)
 
-library(mlim)
+library(mlimlight)
 library(mice)
 data("iris")
 
