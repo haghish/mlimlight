@@ -26,5 +26,9 @@ install_github("haghish/mlimlight")
 __`mlim`__ is also available in Stata. The [__`github package`__](https://github.com/haghish/github) is the only recommended way for installing **`mlim`**. Once [__`github`__](https://github.com/haghish/github) is installed, you can install the package with the following command:
 
 ```js
+// Install Rcall for interfacing R in Stata
+github install haghish/rcall
+
+// install mlim
 github install haghish/mlimlight
 ```
